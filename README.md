@@ -1,1 +1,1 @@
-# EC530
+# software engineering principles
