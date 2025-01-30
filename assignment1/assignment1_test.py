@@ -1,33 +1,79 @@
+# created with help from ChatGPT on 1/30/25
 from assignment1 import *
+import unittest
+import pandas as pd
+from io import StringIO
 
-def test():
-    boston = [42.3555, -71.0565]
-    chicago = [41.8781, -87.6298]
-    paris = [48.8566, 2.3522]
-    ny = [40.7128, -74.0060]
-    saopaolo = [-23.5505, -46.6333]
-    sydney = [-33.8688, 151.2093]
-    tokyo = [35.6895, 139.6917]
+class TestGeoFunctions(unittest.TestCase):
 
-    # subtest 1 cases
-    assert round(dist_two_points(boston, chicago),4) == 1365.8663
-    assert round(dist_two_points(paris, ny),4) == 5837.2409
-    assert round(dist_two_points(saopaolo, sydney),4) == 13357.2060
-    assert round(dist_two_points([0,0], [0,0]), 4) == 0
-    assert round(dist_two_points([-90, -180], [90, 180]), 4) == 20015.0868
-    assert round(dist_two_points([-91, 0], [0, 0]), 4) == 100000
-    assert round(dist_two_points([0, 90], [760, 0]), 4) == 100000
-    assert round(dist_two_points([0, 90], [0, -190]), 4) == 100000
+    def test_haversine(self):
+        # Test known distance (New York City to Los Angeles)
+        nyc = (40.7128, -74.0060)
+        la = (34.0522, -118.2437)
+        expected_distance = 3940  # Approximate distance in km
+        result = haversine(nyc, la)
+        self.assertAlmostEqual(result, expected_distance, delta=10)  # Allow small error margin
 
-    # subtest 2 cases
-    arr1 = [[35.6895, 139.6917],[48.8566, 2.3522],[30.0444, 31.2357]] # tokyo, paris, cairo
-    arr2 = [[40.7128, -74.0060],[42.3555, -71.0565],[41.8781, -87.6298]] # new york, boston, chicago
-    closest1 = dist_all_points(arr1,arr2)
-    for loc in closest1:
-        print(f'The closest point to {loc[0]} is {loc[1]}')
+        # Same location should return zero
+        self.assertEqual(haversine(nyc, nyc), 0)
 
-    arr3 = [[35.6895, 139.6917],[48.8566, 2.3522]]
-    arr4 = [[-91,0]]
-    closest2 = dist_all_points(arr3,arr4)
-    for loc in closest2:
-        print(f'The closest point to {loc[0]} is {loc[1]}')
+    def test_match_closest(self):
+        locations1 = [(40.7128, -74.0060), (34.0522, -118.2437)]  # NYC, LA
+        locations2 = [(41.8781, -87.6298), (29.7604, -95.3698)]  # Chicago, Houston
+
+        # Expect NYC to be closest to Chicago, LA to Houston
+        expected_output = [
+            [(40.7128, -74.0060), (41.8781, -87.6298)],
+            [(34.0522, -118.2437), (29.7604, -95.3698)]
+        ]
+        self.assertEqual(match_closest(locations1, locations2), expected_output)
+
+    def test_clean_data(self):
+        # Valid inputs
+        self.assertEqual(clean_data(("40.7128N", "74.0060W")), (40.7128, -74.0060))
+        self.assertEqual(clean_data(("34.0522S", "118.2437E")), (-34.0522, 118.2437))
+
+        # Invalid latitude and longitude
+        self.assertIsNone(clean_data(("100.1234N", "74.0060W")))  # Latitude out of bounds
+        self.assertIsNone(clean_data(("40.7128N", "190.0000E")))  # Longitude out of bounds
+
+        # Mixed input
+        self.assertEqual(clean_data(("34.0522", "-118.2437")), (34.0522, -118.2437))
+
+        # Invalid non-numeric input
+        self.assertIsNone(clean_data(("invalid", "74.0060W")))
+        self.assertIsNone(clean_data(("40.7128N", "invalid")))
+
+    def test_clean_data_empty(self):
+        # Empty input should return None
+        self.assertIsNone(clean_data(("", "")))
+
+    def test_clean_data_no_direction(self):
+        # Already in correct format
+        self.assertEqual(clean_data(("51.5074", "-0.1278")), (51.5074, -0.1278))  # London
+
+    def test_clean_data_extra_spaces(self):
+        # Should handle extra spaces
+        self.assertEqual(clean_data((" 40.7128N ", " 74.0060W ")), (40.7128, -74.0060))
+
+    def test_read_csv(self):
+        # Simulate CSV input
+        csv_data = """latitude,longitude
+        40.7128,-74.0060
+        34.0522,-118.2437
+        """
+
+        df = pd.read_csv(StringIO(csv_data))
+        locations = list(zip(df["latitude"], df["longitude"]))
+        expected_locations = [(40.7128, -74.0060), (34.0522, -118.2437)]
+        self.assertEqual(locations, expected_locations)
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+# class TestHaversine(unittest.TestCase):
+#     def test_haversine_value(self):
+#         self.assertEqual(haversine(("13.3434E", "45.1234N")), (13.3434, 45.1234))
+#
+# class TestMatchClosest(unittest.TestCase):
