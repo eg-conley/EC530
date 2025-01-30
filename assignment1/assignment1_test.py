@@ -1,6 +1,6 @@
 from assignment1 import *
 
-def test():
+def test_dist_two_points():
     boston = [42.3555, -71.0565]
     chicago = [41.8781, -87.6298]
     paris = [48.8566, 2.3522]
@@ -9,7 +9,6 @@ def test():
     sydney = [-33.8688, 151.2093]
     tokyo = [35.6895, 139.6917]
 
-    # subtest 1 cases
     assert round(dist_two_points(boston, chicago),4) == 1365.8663
     assert round(dist_two_points(paris, ny),4) == 5837.2409
     assert round(dist_two_points(saopaolo, sydney),4) == 13357.2060

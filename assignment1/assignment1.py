@@ -118,7 +118,6 @@ def main():
             user_lon2 = input('Enter number of longitude column: ')
             df2 = pd.read_csv(user_input2, header=None, usecols=[int(user_lat2), int(user_lon2)])
             loc2 = list(zip(df2[int(user_lat2)], df2[int(user_lon2)]))
-            print(loc2)
         else:
             df2 = pd.read_csv(user_input2)
             user_lat2 = input('Enter name of latitude column: ')
