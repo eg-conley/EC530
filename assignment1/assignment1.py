@@ -1,155 +1,145 @@
 import math
 import pandas as pd
 import re
+import sys
 
-# function returns distance between two geo locations in form (latitude, longitude)
-def dist_two_points(loc1, loc2):
-        # convert to radians
-        lat1 = math.radians(loc1[0])
-        lon1 = math.radians(loc1[1])
-        lat2 = math.radians(loc2[0])
-        lon2 = math.radians(loc2[1])
+# this function returns the spherical distance between two geo-locations passed into the function in (latitude, longitude) form
+def haversine(location1, location2):
+    r = 6371 # define radius of earth in km
 
-        # find diff in latitude and longitude
-        lat_diff = lat2 - lat1
-        lon_diff = lon2 - lon1
+    # convert to radians
+    lat1 = math.radians(location1[0])
+    lon1 = math.radians(location1[1])
+    lat2 = math.radians(location2[0])
+    lon2 = math.radians(location2[1])
 
-        # Haversine formula - shortest distance between two points on a sphere
-        a = math.pow(math.sin(lat_diff/2),2) + math.cos(lat1) *  math.cos(lat2) * math.pow(math.sin(lon_diff/2),2)
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-        r = 6371 # km
+    # find diff in latitude and longitude
+    lat_diff = lat2 - lat1
+    lon_diff = lon2 - lon1
 
-        # distance formula where R is radius of Earth in km
-        return r * c
+    # Haversine formula finds shortest distance between two points on a sphere
+    a = math.pow(math.sin(lat_diff/2),2) + math.cos(lat1) *  math.cos(lat2) * math.pow(math.sin(lon_diff/2),2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
-# not most efficient, but iterating through second array for each element in first
-# returns list with [location from array 1],[closest location from array 2]
-def dist_all_points(loc1_array, loc2_array):
-    closest_locations = []
-    for loc1 in loc1_array:
-        distances = [dist_two_points(loc1, loc2) for loc2 in loc2_array]
-        point = distances.index(min(distances))
-        closest_locations.append([loc1, loc2_array[point]])
-    return closest_locations
+    # distance formula where R is radius of Earth in km
+    return r * c
 
-def ddm_to_decimal(point):
-    degrees = float(point.split(' ')[0])
-    minutes = float(point.split(' ')[1])
-    return degrees + (minutes/60)
+# this function returns an array with each location in the first array and its closest location from the second array
+# not currently the most efficient (n^2)
+def match_closest(location_arr1, location_arr2):
+    matched = []
+    for location1 in location_arr1:
+        distances = [haversine(location1, location2) for location2 in location_arr2]
+        min_dist_index = distances.index(min(distances))
+        matched.append([location1, location_arr2[min_dist_index]])
+    return matched
 
-def dms_to_decimal(point):
-    split_point1 = point.split('°')
-    split_point2 = split_point1[1].split("'")
+# this function scrubs the location points and makes sure that only those in the form (latitude, longitude) are used
+# it accounts for and corrects the data  if N, S, E, W are included
+def clean_data(location):
+    clean_location = []
+    for i, point in enumerate(location):
+        # check for directional characters (N, E, S, W)
+        if isinstance(point, str):
+            point = point.strip().upper() # remove spaces and uppercase if needed
+            if 'S' in point or 'W' in point:
+                point = re.sub('[^0-9.]', '', point) # remove letter
+                point = '-' + point # make negative
+            else:
+                point = re.sub('[^0-9.-]', '', point) # just remove letter
+        try:
+            point = float(point)
+        except ValueError as e:
+            print('Please use locations in the format (latitude, longitude)')
+            print(e)
+            return None
 
-    degrees = float(split_point1[0])
-    minutes = float(split_point2[0])
-    seconds = float(split_point2[1].replace('"', ''))
-    return degrees + (minutes / 60) + (seconds / 3600)
+        # check latitude and longitude bounds
+        if i == 0 and not -90 <= point <= 90:
+            print(f"Invalid latitude: {point}. Won't be used.")
+            return None
+        if i == 1 and not -180 <= point <= 180:
+            print(f"Invalid longitude: {point}. Won't be used.")
+            return None
 
-def clean_data(coord):
-    clean_coord = []
-    for point in coord:
-        if type(point) == float:
-            clean_coord.append(point)
-        else:
-            try:
-                # check for directional characters (N, E, S, W)
-                if any(direction in point.upper() for direction in ['N', 'S', 'E', 'W']):
-                    if 'S' in point.upper() or 'W' in point.upper():
-                        # make negative
-                        point = '-' + point
+        clean_location.append(point)
+    return tuple(clean_location)
 
-                # check if in ddm form
-                if ' ' and '.' in point:
-                    point = ddm_to_decimal(point)
-                # check if in dms form
-                elif '"' in point:
-                    point = dms_to_decimal(point)
-
-                # remove non-numbers
-                if type(point) != float:
-                    point = re.sub('[^0-9.,-]', '', point)
-
-                clean_coord.append(float(point))
-
-            except ValueError as e:
-                print(e)
-    return tuple(clean_coord)
-
+# this function loads in data from a csv file and calls the other functions
+# user can also elect to manually input values
 def main():
-    # declare arrays for input data (not cleaned)
-    loc1 = []
-    loc2 = []
+    # arrays for csv data
+    location_arr1 = []
+    location_arr2 = []
+    location_arr1_clean = []
+    location_arr2_clean = []
 
-    user_input1 = input('Enter title of first file or press 1 to input manually: ')
-    if user_input1 == '1':
-            should_continue = 'y'
-            while should_continue == 'y':
-                lat = input("Latitude: ")
-                lon = input("Longitude: ")
-                loc1.append( (float(lat),float(lon)) )
-                should_continue = input('Do you want to continue? (y/n): ')
+    user_input1 = input('Enter title of first file or press 0 to input manually: ')
+    if user_input1 == '0':
+        continue_flag = 'y'
+        while continue_flag == 'y':
+            lat1 = input("Latitude: ")
+            lon1 = input("Longitude: ")
+            location1_clean = clean_data( (lat1,lon1) )
+            if location1_clean is not None:
+                location_arr1_clean.append(location1_clean)
+            continue_flag = input('Do you want to continue? (y/n): ')
     else:
-        # read csv into dataframe
-        has_header1 = input('Does the file have a header? (y/n): ')
-        if has_header1 == 'n':
-            user_lat1 = input('Enter number of latitude column (0 index): ')
-            user_lon1 = input('Enter number of longitude column (0 index): ')
-            df1 = pd.read_csv(user_input1, header=None, usecols=[int(user_lat1), int(user_lon1)])
-            loc1 = list(zip(df1[int(user_lat1)], df1[int(user_lon1)]))
-        else:
+        try:
+            # read csv into dataframe
             df1 = pd.read_csv(user_input1)
-            user_lat1 = input('Enter name of latitude column: ')
-            user_lon1 = input('Enter name of longitude column: ')
-            loc1 = list(zip(df1[user_lat1], df1[user_lon1]))
+            lats1 = input('Enter name of latitude column: ')
+            lons1 = input('Enter name of longitude column: ')
+            location_arr1 = list(zip(df1[lats1], df1[lons1]))
 
-    user_input2 = input('Enter title of second file or press 1 to input manually: ')
-    if user_input2 == '1':
-        should_continue = 'y'
-        while should_continue == 'y':
-            lat = input("Latitude: ")
-            lon = input("Longitude: ")
-            loc2.append( (float(lat),float(lon)) )
-            should_continue = input('Do you want to continue? (y/n): ')
+            # clean the csv data
+            for location1 in location_arr1:
+                location1_clean = clean_data(location1)
+                if location1_clean is not None:
+                    location_arr1_clean.append(location1_clean)
+        except ValueError as e:
+            print('Please use locations in the format (latitude, longitude)')
+            print(e)
+            sys.exit(1)
+        except FileNotFoundError:
+            print(f"Error: The file '{user_input1}' was not found. Please check the path and try again.")
+            sys.exit(1)
+
+    user_input2 = input('Enter title of second file or press 0 to input manually: ')
+    if user_input2 == '0':
+        continue_flag = 'y'
+        while continue_flag == 'y':
+            lat2 = input("Latitude: ")
+            lon2 = input("Longitude: ")
+            location2_clean = clean_data((lat2, lon2))
+            if location2_clean is not None:
+                location_arr2_clean.append(location2_clean)
+            continue_flag = input('Do you want to continue? (y/n): ')
     else:
-        has_header2 = input('Does the file have a header? (y/n): ')
-        if has_header2 == 'n':
-            user_lat2 = input('Enter number of latitude column: ')
-            user_lon2 = input('Enter number of longitude column: ')
-            df2 = pd.read_csv(user_input2, header=None, usecols=[int(user_lat2), int(user_lon2)])
-            loc2 = list(zip(df2[int(user_lat2)], df2[int(user_lon2)]))
-            print(loc2)
-        else:
+        try:
+            # read csv into dataframe
             df2 = pd.read_csv(user_input2)
-            user_lat2 = input('Enter name of latitude column: ')
-            user_lon2 = input('Enter name of longitude column: ')
-            loc2 = list(zip(df2[user_lat2], df2[user_lon2]))
+            lats2 = input('Enter name of latitude column: ')
+            lons2 = input('Enter name of longitude column: ')
+            location_arr2 = list(zip(df2[lats2], df2[lons2]))
 
-    # parse data/error check and make sure it meets correct conventions to be used in the equation
-    loc1_clean = []
-    loc2_clean = []
+            # clean the csv data
+            for location2 in location_arr2:
+                location2_clean = clean_data(location2)
+                if location2_clean is not None:
+                    location_arr2_clean.append(location2_clean)
+                location_arr2_clean.append(clean_data(location2))
+        except ValueError as e:
+            print('Please use locations in the format (latitude, longitude)')
+            print(e)
+            sys.exit(1)
+        except FileNotFoundError:
+            print(f"Error: The file '{user_input1}' was not found. Please check the path and try again.")
+            sys.exit(1)
 
-    for coord_pair1 in loc1:
-        clean_pair1 = clean_data(coord_pair1)
-        if clean_pair1 is None:
-            print(f"Coordinates {clean_pair1} not valid and will not be used")
-        elif not (-90 <= clean_pair1[0] <= 90 and -180 <= clean_pair1[1] <= 180):
-            print(f"Coordinates {clean_pair1} not valid and will not be used")
-        else:
-            loc1_clean.append(clean_pair1)
-
-
-    for coord_pair2 in loc2:
-        clean_pair2 = clean_data(coord_pair2)
-        if clean_pair2 is None:
-            print(f"Coordinates {clean_pair2} not valid and will not be used")
-        elif not (-90 <= clean_pair2[0] <= 90 and -180 <= clean_pair2[1] <= 180):
-            print(f"Coordinates {clean_pair2} not valid and will not be used")
-        else:
-            loc2_clean.append(clean_pair2)
-
-    # create arrays and pass into function
-    result = dist_all_points(loc1_clean, loc2_clean)
-    print(result)
+    # apply matching function and return results
+    result = match_closest(location_arr1_clean, location_arr2_clean)
+    print(result) # for error checking
+    return result
 
 main()
