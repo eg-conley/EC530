@@ -1,10 +1,26 @@
-# created with help from ChatGPT on 1/30/25
+# created with from ChatGPT on 1/30/25
 from assignment1 import *
 import unittest
 import pandas as pd
 from io import StringIO
+#import os
+from unittest.mock import patch
 
 class TestGeoFunctions(unittest.TestCase):
+    # def test_user_input(self):
+    #     user_input = os.getenv("TEST_USER_INPUT", "default_value")
+    #     assert user_input == "default_value"
+
+    def test_main_with_mocked_input(self):
+        inputs = [
+            "0",  # Choose manual input for first file
+            "40.7128", "-74.0060", "n",  # One set of coordinates
+            "0",  # Choose manual input for second file
+            "34.0522", "-118.2437", "n",  # One set of coordinates
+        ]
+        with patch("builtins.input", side_effect=inputs):
+            result = main()
+        self.assertEqual(result, [[(40.7128, -74.006), (34.0522, -118.2437)]])
 
     def test_haversine(self):
         # Test known distance (New York City to Los Angeles)
@@ -70,10 +86,3 @@ class TestGeoFunctions(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
-
-# class TestHaversine(unittest.TestCase):
-#     def test_haversine_value(self):
-#         self.assertEqual(haversine(("13.3434E", "45.1234N")), (13.3434, 45.1234))
-#
-# class TestMatchClosest(unittest.TestCase):

@@ -56,10 +56,10 @@ def clean_data(location):
 
         # check latitude and longitude bounds
         if i == 0 and not -90 <= point <= 90:
-            print(f"Invalid latitude: {point}. Won't be used.")
+            #print(f"Invalid latitude: {point}. Won't be used.")
             return None
         if i == 1 and not -180 <= point <= 180:
-            print(f"Invalid longitude: {point}. Won't be used.")
+            #print(f"Invalid longitude: {point}. Won't be used.")
             return None
 
         clean_location.append(point)
